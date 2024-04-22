@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "ParleyPy"
+version = "0.2.2"
+description = "cannibalization of existing uk parliament python api wrappers"
+authors = ["tom <tom@remotelyhuman.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.31.0"
+datetime = "^5.5"
+keyring = "^25.1.0"
+keyrings-google-artifactregistry-auth = "^1.1.2"
+
+
+[[tool.poetry.source]]
+name = "wipy"
+url = "https://europe-west2-python.pkg.dev/westminster-405513/wipy/"
+priority = "supplemental"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
