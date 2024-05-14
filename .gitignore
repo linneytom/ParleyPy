@@ -93,3 +93,6 @@ ENV/
 .vagrant/
 README.rst
 *_cache/
+
+## PERSONAL ADDITIONS
+.DS_Store

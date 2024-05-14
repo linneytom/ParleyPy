@@ -218,7 +218,7 @@ class Divisions(object):
         return response
         
 
-class Schedual(object):
+class Calendar(object):
     # https://whatson-api.parliament.uk/swagger/ui/index#!/Events/Events_EventsByDate
     # requires date dd-mm-yyyy to get all events that date
 
@@ -238,9 +238,16 @@ class Schedual(object):
             base_endpoint=self.ENDPOINT["base"],
             page_size_max=self.PAGE_SIZE_MAX
         )
-        self.event_types = self.__clean_types__("types/list.json")
-        self.event_categories = self.__clean_types__("categories/list.json")
-        self.event_locations = self.__clean_types__("locations/list.json")
+
+    def get_references(self):
+        event_types = self.__clean_types__("types/list.json")
+        event_categories = self.__clean_types__("categories/list.json")
+        event_locations = self.__clean_types__("locations/list.json")
+        return {
+            "event_types": event_types,
+            "event_categories": event_categories,
+            "event_locations": event_locations
+        }
     
     def get_sessions(self):
         # always gets all of them (only way i think)
