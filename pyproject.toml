@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ParleyPy"
-version = "0.2.5"
+version = "0.2.6"
 description = "cannibalization of existing uk parliament python api wrappers"
 authors = ["tom <tom@remotelyhuman.com>"]
 readme = "README.md"

@@ -1,5 +1,5 @@
 import urllib.parse
-from typing import Dict, List
+from typing import Dict, List, Union
 import requests
 
 class Parley(object):
@@ -69,13 +69,60 @@ class Parley(object):
         )
         return response
     
+class Committees(object):
+
+    ENDPOINT = {
+        "base": "https://committees-api.parliament.uk/api/",
+        "committees": "Committees",
+        "committee_business": "CommitteeBusiness",
+        "committee_members": "Committees/{committee_id}/Members",
+        "committee_attendance": "Committees/{committee_id}/"
+    }
+    PAGE_SIZE_MAX = 30
+    def __init__(self):
+        self.parley = Parley(
+            base_endpoint=self.ENDPOINT["base"],
+            page_size_max=self.PAGE_SIZE_MAX
+        )
+    
+    def get_committees(self, **kwargs) -> List[dict]:
+        return self.parley.__exhaustive_fetch__(self.ENDPOINT["committees"], **kwargs)["items"]
+    
+    def get_committee_business(self, committee_ids: Union[int,List[int]]) -> List[dict]:
+        if isinstance(committee_ids, int):
+            committee_ids = [committee_ids]
+        committee_business = []
+        for committee_id in committee_ids:
+            business = self.parley.__exhaustive_fetch__(
+                self.ENDPOINT["committee_business"],
+                CommitteeId=committee_id
+            )["items"]
+            for b in business:
+                b.update({"committeeId":committee_id})
+            committee_business.extend(business)
+        return committee_business
+    
+    def get_committee_members(self, committee_ids: Union[int, List[int]]) -> List[dict]:
+        if isinstance(committee_ids, int):
+            committee_ids = [committee_ids]
+        committee_members = []
+        for committee_id in committee_ids:
+            members = self.parley.__exhaustive_fetch__(
+                self.ENDPOINT["committee_members"].format(committee_id=committee_id)
+            )["items"]
+            for m in members:
+                m.update({"committeeId":committee_id})
+            committee_members.extend(members)
+    
 class Bills(object):
-    """class to orchastrate Parley fetching bill data
+    """class to orchastrate ParleyPy fetching from the bill api
     """
     ENDPOINT = {
         "base": "https://bills-api.parliament.uk/api/",
-        "search": "v1/Bills",
-        "sittings": "v1/Sittings"
+        "bills": "v1/Bills",
+        "sittings": "v1/Sittings",
+        "stages": "v1/Bills/{bill_id}/Stages",
+        "amendments": "v1/Bills/{bill_id}/Stages/{stage_id}/Amendments"
     }
     PAGE_SIZE_MAX = 999
     def __init__(self):
@@ -83,67 +130,55 @@ class Bills(object):
             base_endpoint=self.ENDPOINT["base"],
             page_size_max=self.PAGE_SIZE_MAX
         )
-        self.bill_types = self.__clean_types__("v1/BillTypes")
-        self.publication_types = self.__clean_types__("v1/PublicationTypes")
-        self.stage_types = self.__clean_types__("v1/Stages")
     
 
-    def get_bills(self, **kwargs):
+    def get_bills(self, date: str = None, **kwargs):
+        """gets all bills & there details for a parlimentry session (or session of provided date)
+        required:
+            Session: int (session id of session to fecth) OR date: str (date within session to fetch)
+        """
+        if not kwargs:
+            kwargs = {}
+        if date is not None:
+            session_id=Calendar().get_session_id_for_date(date)
+            kwargs["Session"]=session_id
+        if "Session" not in kwargs:
+            raise ValueError("`Session` or `date` must be provided")
+        
         response = self.parley.__exhaustive_fetch__(
-            self.ENDPOINT["search"],
+            self.ENDPOINT["bills"],
             **kwargs
         )
         bills = []
         for bill_summary in response["items"]:
             bill_id = bill_summary["billId"]
             bill = self.parley.__fetch__(
-                endpoint=self.ENDPOINT["search"]+"/"+str(bill_id)
+                endpoint=self.ENDPOINT["bills"]+"/"+str(bill_id)
             )
             bills.append(bill)
         return bills
     
-    def get_publications(self, bill_id: int):
-        return self.parley.__fetch__(
-            self.ENDPOINT["search"] \
-                + "/" + str(bill_id) \
-                + "/Publications"
-        )["publications"]
-
-    def get_amendments(self, bill_id: int, stage_id: int):
-        return self.parley.__exhaustive_fetch__(
-            self.ENDPOINT["search"] \
-            + "/" + str(bill_id) \
-            + "/Stages" \
-            + "/" + str(stage_id) \
-            + "/Amendments"
-        )["items"]
-
-    def get_stages(self, bill_id: int):
-        bill_stages = self.parley.__exhaustive_fetch__(
-            self.ENDPOINT["search"]+"/"+str(bill_id)+"/Stages"
-        )["items"]
-        for stage in bill_stages:
-            stage_id = stage["id"]
-            stage["documents"] = self.parley.__fetch__(
-                self.ENDPOINT["search"] \
-                + "/" + str(bill_id) \
-                + "/Stages" \
-                + "/" + str(stage_id) \
-                + "/Publications"
-            )
-        return bill_stages
+    def get_stages(self, bill_ids: Union[int, List[int]]) -> List[dict]:
+        if isinstance(bill_ids, int):
+            bill_ids = [bill_ids]
+        stages = []
+        for bill_id in bill_ids:
+            bill_stages = self.parley.__exhaustive_fetch__(self.ENDPOINT["stages"].format(bill_id=bill_id))["items"]
+            for stage in bill_stages:
+                stage.update({"billId":bill_id})
+            stages.extend(bill_stages)
+        return stages
     
-    def get_sittings(self, start_date: str, end_date: str):
-        # gets the date of the bills are being discussed
-        return self.parley.__exhaustive_fetch__(
-            self.ENDPOINT["sittings"],
-            dateFrom=start_date,
-            dateTo=end_date
-        )
-
-    def __clean_types__(self, endpoint: str):
-        raw_types = self.parley.__exhaustive_fetch__(endpoint)["items"]
-        return {t["id"]:{k:v for k,v in t.items() if k!="id"} for t in raw_types}
+    def get_amendments(self, bill_id: int, stage_ids: Union[int, List[int]]) -> List[dict]:
+        if isinstance(stage_ids, int):
+            stage_ids = [stage_ids]
+        amendments = []
+        for stage_id in stage_ids:
+            stage_amendments = self.parley.__exhaustive_fetch__(
+                self.ENDPOINT["amendments"].format(bill_id=bill_id,stage_id=stage_id)
+            )["items"]
+            amendments.extend(stage_amendments)
+        return amendments
         
 
 class Members(object):
@@ -229,7 +264,8 @@ class Calendar(object):
         "events": "events/list.json",
         "non_sitting_days": "events/nonsitting.json",
         "sessions": "sessions/list.json",
-        "speakers": "events/speakers.json"
+        "speakers": "events/speakers.json",
+        "sessions_for_date": "sessions/forDate.json/{date}"
     }
     PAGE_SIZE_MAX = 31
 
@@ -255,6 +291,17 @@ class Calendar(object):
             self.ENDPOINT["sessions"]
         )
     
+    def get_session_id_for_date(self, date: str) -> int:
+        """queries the sessions api to find the session id for a given date, useful for endpoints that require a session id for filtering by date"""
+        response = self.parley.__fetch__(self.ENDPOINT["sessions_for_date"].format(date=date))
+        return response["SessionId"]
+    
+    def get_next_session_id(self, date: str = None, session_id: int = None) -> int:
+        if date is None and session_id is None:
+            raise ValueError("date or session_id must be provided")
+        all_sessions = self.get_sessions()
+
+    
     def get_events(self, start_date: str, end_date: str):
         # dd-mm-yyyy
         return self.parley.__fetch__(
@@ -274,3 +321,43 @@ class Calendar(object):
         raw_types = self.parley.__fetch__(endpoint)
         return {t["Id"]:{k:v for k,v in t.items() if k!="Id"} for t in raw_types}
 
+
+class ParliamentReferences(object):
+    # TODO: move this logic into parliament_ingestion and have Bills & Committees fetch their own types amalgamated by parliament_ingestion
+
+    COMMITTEE_ENDPOINT = {
+        "base": "https://committees-api.parliament.uk/api/",
+        "committee": "CommitteeType",
+        "committee_business": "CommitteeBusinessType"
+    }
+    BILL_ENDPOINT = {
+        "base": "https://bills-api.parliament.uk/api/v1/",
+        "bill": "BillTypes",
+        "bill_publication": "PublicationTypes",
+        "bill_stage": "Stages"
+    }
+
+    def __init__(self):
+        self.bill_parley = Parley(base_endpoint=self.BILL_ENDPOINT["base"])
+        self.committee_parley = Parley(base_endpoint=self.COMMITTEE_ENDPOINT["base"])
+    
+    def get_types(self):
+        parliament_type_map = {
+            "committee":"parliament-committee-types",
+            "committee_business":"parliament-committee_business-types",
+            "bill":"parliament-bill-types",
+            "bill_publication":"parliament-bill_publication-types",
+            "bill_stage":"parliamet-bill_stage-types"
+        }
+        types = []
+        for parliament_endpoint, _ in parliament_type_map.items():
+            if parliament_endpoint.startswith("committee"):
+                parliament_types = self.committee_parley.__fetch__(self.COMMITTEE_ENDPOINT[parliament_endpoint])
+                type_name = self.COMMITTEE_ENDPOINT[parliament_endpoint]
+            else:
+                parliament_types = self.bill_parley.__exhaustive_fetch__(self.BILL_ENDPOINT[parliament_endpoint])["items"]
+                type_name = self.BILL_ENDPOINT[parliament_endpoint]
+            for t in parliament_types:
+                t.update({"parliamentType":type_name})
+            types.extend(parliament_types)
+        return types

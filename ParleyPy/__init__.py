@@ -1,4 +1,18 @@
-from .parliament import Bills, Members, Calendar, Divisions
+from .parliament import (
+    Bills,
+    Members,
+    Calendar,
+    Divisions,
+    Committees,
+    ParliamentReferences
+)
 
-__version__ = "0.2.5"
-__all__ = ["Bills", "Members", "Calendar", "Divisions"]
+__version__ = "0.2.6"
+__all__ = [
+    "Bills",
+    "Members",
+    "Calendar",
+    "Divisions",
+    "Committees",
+    "ParliamentReferences"
+]
